@@ -1,0 +1,162 @@
+---
+title: "UEA UCU <br> COVID-19 <br> Member Survey"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+    highlight: pygments
+css: css/survey.css
+---
+
+```{r load, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+library(tidyverse)
+library(tidytext)
+library(RColorBrewer)
+library(wordcloud)
+library(kableExtra)
+library(googledrive)
+library(plotly)
+library(lubridate)
+library(htmltools)
+library(equatiomatic)
+source("functions/Load_and_clean.R")
+theme_set(theme_classic())
+```
+
+<img src="img/UCU banner.png" style="position:absolute;top:0px;right:0px;" />
+
+As mandated by members during our last Extraordinary General Meeting, the UEA UCU Committee has created a brief, anonymous survey to collate member experiences and feedback and ensure this informs our ongoing discussions with management. 
+
+This survey currently has **`r nrow(dd)` responses** with the last addition at **`r last(dd$Timestamp)`**. 
+
+This script was last run on **`r lubridate::as_datetime(today())`**.
+
+## Question 1 - What department are you based in?
+
+```{r q1}
+bartwo <- mybar(dd,30, ordered = FALSE, colbyrisk=FALSE, perc=FALSE)
+bartwo+scale_x_discrete(guide=guide_axis(n.dodge=2))
+```
+
+## Question 2 - Would you class yourself, or those in your household, as moderate risk or high risk from COVID-19?
+
+```{r q2}
+mybar(dd,3, ordered = TRUE, colbyrisk=F)
+
+```
+
+## Question 5 - Have you undertaken any face-to-face learning activities so far this term?
+
+```{r q5}
+mybar(dd,6, ordered = TRUE)
+```
+
+
+
+## Question 7 - How satisfied are you with the training and support available to staff to aid "blended" or fully online learning approaches?
+
+```{r q7}
+mybar(dd,8)
+```
+
+
+## Questions 9:13 - How strongly do you agree with the following statements?
+
+```{r q9 to 13,fig.height = 20}
+dd %>%
+  select(10:14) %>%
+  mutate(myfill = ifelse(grepl("low risk",pull(dd, 3)),"Low risk", "High risk")) %>%
+  mutate(myfill = factor(myfill,levels = c("Low risk","High risk"))) %>%
+  gather(key = key, value = value, -myfill) %>%
+  mutate(cq = value) %>%
+  filter(!(is.na(cq))) %>%
+  mutate(key = str_remove(key,"How strongly do you agree with the following statements")) %>%
+  mutate(key = str_remove_all(key,"\\[|\\]|\\?")) %>%
+  mutate(cq = str_wrap(cq,width = 15),
+         key = str_wrap(key,width = 50)) %>%
+  mutate(cq = factor(cq,levels = c("Strongly Disagree","Disagree","Neither Agree nor\nDisagree","Agree","Strongly Agree"))) %>%
+  ggplot(aes(x = cq, fill = myfill)) +
+  geom_bar()+
+  theme(axis.text.x = element_text(angle = 0,
+                                   hjust=0.5,vjust=0.5))+
+  ylab("Count")+
+  xlab("")+
+  facet_wrap(~key,ncol = 2, scale="free_y")+
+  theme(axis.text.x = element_text(),
+        legend.title = element_blank(),
+        legend.position = c(1, 0), 
+        legend.justification = c(3, -3)
+  )+
+
+  scale_fill_manual(values = c("purple4","hotpink1"))+
+  guides(myfill=guide_legend(override.aes = list(size=5)))
+
+
+
+
+```
+
+##  Questions 14 -  Which of the following statements match your feelings about face-to-face learning activities? (Tick all that apply)
+
+```{r q14}
+answers <- c("I feel my concerns are heard locally, but ignored by Faculty and/or University management",
+             "I don't have any concerns about face-to-face learning activities",
+             "I feel my concerns have been totally ignored",
+             "I don't know how to effectively voice my concerns",
+             "I feel my concerns are heard and appropriate actions are taken",
+             "I feel my concerns are heard, but nothing is done as a result")
+
+d1 <- filter(dd,grepl("low risk",pull(dd, 3)))
+d2 <- filter(dd,!grepl("low risk",pull(dd, 3)))
+
+t1 <- tibble(answers,
+             count = map_int(answers, ~sum(grepl(.,pull(d1,15)))),
+             myfill = "Low risk") %>%
+  mutate(answers = str_wrap(answers,width = 15))
+t2 <- tibble(answers,
+             count = map_int(answers, ~sum(grepl(.,pull(d2,15)))),
+             myfill = "High risk") %>%
+  mutate(answers = str_wrap(answers,width = 15))
+
+temp <- bind_rows(t1,t2)
+temp$answers <- factor(temp$answers,levels = t2$answers[order(t1$count, decreasing = T)])
+    temp$myfill <- factor(temp$myfill,levels = c("Low risk","High risk"))
+
+    ggplot(temp, aes(x = answers,fill = myfill, y = count)) +
+      geom_bar(stat = "identity")+
+      theme(axis.text.x = element_text(angle = 0,
+                                       hjust=0.95,vjust=0.5),
+            legend.title = element_blank()) +
+      ylab("Count")+
+      xlab("")+
+      scale_fill_manual(values = c("purple4","hotpink1"))
+```
+
+
+## Comments
+
+#### N.B. responses have been shared only when permission was granted to do so
+
+```{r q24}
+dd %>% filter(!is.na(.[[25]]),
+              .[[29]] == "Yes, you may cite my written responses to the open questions in this survey") %>%
+  select(" " = 25) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+
+## Simple stats tests
+
+A simple ANOVA of self-declared risk level to COVID-19 as a predictor of responses to the question 
+"How satisfied are you with the resumption of face-to-face learning activities?"
+
+```{r}
+dd[[3]] <- factor(dd[[3]], levels=names(table(dd[[3]])[order(table(dd[[3]]), decreasing=T)]))
+m=lm(dd[[7]]~dd[[3]])
+
+kable((anova(m)), digits=2)
+```
+
