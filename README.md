@@ -1,7 +1,5 @@
 # OHF_example
-A script designed to process survey data and produce graphs and analytics in an HTML output
-
-### In progress
+A script designed to process opinion survey data and produce graphs and analytics in an HTML output
 
 ## Project description
 A short presentation which takes the results from a Google forms survey published in .csv format and produces barplots and one analysis example. 
